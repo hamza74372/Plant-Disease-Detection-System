@@ -1,0 +1,13 @@
+# DEEP LEARNING INFERENCE
+tensorflow
+keras
+numpy
+Pillow
+pandas
+
+# WEB BACKEND AND SERVER
+Flask
+waitress
+
+# UTILITIES
+scikit-learn
