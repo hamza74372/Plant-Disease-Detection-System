@@ -1,4 +1,3 @@
-"# Virtual Environment, Data, and Model Assets" 
 venv/
 __pycache__/
 *.pyc
