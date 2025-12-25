@@ -3,7 +3,7 @@ tensorflow
 keras
 numpy
 Pillow
-pandas
+Pandas
 
 # WEB BACKEND AND SERVER
 Flask

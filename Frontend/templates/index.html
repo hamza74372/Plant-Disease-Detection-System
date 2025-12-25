@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriGuard AI | Professional Plant Diagnostics</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-seedling"></i>
+                <span>AgriGuard AI</span>
+            </div>
+            <nav>
+                <div class="nav-item active"><i class="fas fa-search"></i> Diagnostics</div>
+                <div class="nav-item"><i class="fas fa-history"></i> Recent Scans</div>
+                <div class="nav-item"><i class="fas fa-book"></i> Disease Library</div>
+            </nav>
+            <div class="status-card">
+                <p>System Status</p>
+                <div class="status-online">● Model Online</div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <h2>Plant Health Diagnostics</h2>
+                <p>Upload a clear photo of the affected leaf for AI analysis.</p>
+            </header>
+
+            <div class="upload-container" id="drop-zone">
+                <input type="file" id="file-input" hidden accept="image/*">
+                <div class="upload-icon">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                </div>
+                <h3>Drag & drop leaf image</h3>
+                <p>or <span>browse files</span> from computer</p>
+                <em class="file-info">Supports: JPG, PNG, JPEG (Max 5MB)</em>
+            </div>
+
+            <div id="processing-state" class="hidden">
+                <div class="loader"></div>
+                <p>AI is analyzing cellular patterns...</p>
+            </div>
+
+            <div id="result-display" class="result-card hidden">
+                <div class="result-header">
+                    <img id="preview-img" src="" alt="Preview">
+                    <div class="diagnosis">
+                        <span class="label">Primary Diagnosis</span>
+                        <h1 id="disease-name">Detecting...</h1>
+                        <div class="confidence-bar-container">
+                            <div id="confidence-bar" class="confidence-bar"></div>
+                        </div>
+                        <span id="confidence-text">Confidence: 0%</span>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button class="btn-outline" onclick="location.reload()"><i class="fas fa-redo"></i> New Scan</button>
+                    <button class="btn-filled"><i class="fas fa-file-export"></i> Download Report</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

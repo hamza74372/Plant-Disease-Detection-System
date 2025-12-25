@@ -1,0 +1,100 @@
+:root {
+    --bg: #f0f4f3;
+    --sidebar: #1b4332;
+    --accent: #40916c;
+    --text-dark: #081c15;
+    --white: #ffffff;
+    --danger: #95d5b2;
+}
+
+* { box-sizing: border-box; transition: all 0.3s ease; }
+
+body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--bg);
+    height: 100vh;
+    display: flex;
+}
+
+.container { display: flex; width: 100%; }
+
+/* Sidebar */
+.sidebar {
+    width: 260px;
+    background: var(--sidebar);
+    color: white;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.logo { font-size: 1.5rem; font-weight: 800; margin-bottom: 3rem; display: flex; align-items: center; gap: 10px; }
+
+.nav-item {
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #95d5b2;
+}
+
+.nav-item.active, .nav-item:hover { background: rgba(255,255,255,0.1); color: white; }
+
+/* Main Content */
+.main-content { flex: 1; padding: 3rem; overflow-y: auto; }
+
+.upload-container {
+    background: var(--white);
+    border: 2px dashed #cbd5e0;
+    border-radius: 16px;
+    padding: 4rem;
+    text-align: center;
+    cursor: pointer;
+}
+
+.upload-container:hover { border-color: var(--accent); background: #f9fbf9; }
+
+.upload-icon { font-size: 3rem; color: var(--accent); margin-bottom: 1rem; }
+
+/* Result Card */
+.result-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-top: 2rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+}
+
+.result-header { display: flex; gap: 2rem; align-items: center; }
+
+#preview-img { width: 180px; height: 180px; border-radius: 12px; object-fit: cover; }
+
+.confidence-bar-container {
+    width: 100%;
+    height: 8px;
+    background: #edf2f7;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.confidence-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 4px;
+    width: 0%;
+}
+
+.hidden { display: none !important; }
+
+.btn-filled {
+    background: var(--sidebar);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+}
