@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgriGuard Pro | AI Plant Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fas fa-leaf"></i>
+                <span>AgriGuard AI</span>
+            </div>
+            <nav>
+                <div class="nav-item active"><i class="fas fa-th-large"></i> Dashboard</div>
+                <div class="nav-item"><i class="fas fa-history"></i> History</div>
+            </nav>
+            <div class="status-card">
+                <p>System Status</p>
+                <span class="status-online">● Online</span>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <h1>Health Diagnostics</h1>
+                <p>Upload a leaf image for instant AI analysis and treatment plans.</p>
+            </header>
+
+            <section id="upload-section" class="card upload-card">
+                <input type="file" id="file-input" hidden accept="image/*">
+                <div class="drop-zone" id="drop-zone">
+                    <div class="icon-circle"><i class="fas fa-cloud-upload-alt"></i></div>
+                    <h3>Drop leaf image here</h3>
+                    <p>or click to browse files</p>
+                </div>
+            </section>
+
+            <div id="loading-stage" class="hidden">
+                <div class="loader"></div>
+                <p>AI is analyzing pathogens...</p>
+            </div>
+
+            <div id="results-grid" class="bento-grid hidden">
+                <div class="bento-item item-image card">
+                    <img id="preview" src="" alt="Analyzed Leaf">
+                </div>
+                
+                <div class="bento-item item-stats card">
+                    <h3>Diagnosis</h3>
+                    <h2 id="disease-name">Detecting...</h2>
+                    <div class="confidence-container">
+                        <span>Confidence</span>
+                        <div class="progress-bar">
+                            <div id="conf-fill" class="progress-fill"></div>
+                        </div>
+                        <span id="conf-label">0%</span>
+                    </div>
+                </div>
+
+                <div class="bento-item item-advice card">
+                    <div class="advice-header">
+                        <h3><i class="fas fa-robot"></i> Expert Recommendation</h3>
+                        <button id="download-btn" class="btn-primary"><i class="fas fa-download"></i> PDF Report</button>
+                    </div>
+                    <div id="advice-content" class="markdown-body"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

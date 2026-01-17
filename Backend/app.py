@@ -1,0 +1,156 @@
+import os
+import sys
+import json
+import tensorflow as tf
+from io import BytesIO
+from xhtml2pdf import pisa
+from flask import Flask, render_template, request, jsonify, make_response
+from groq import Groq  # Make sure to: pip install groq
+
+# --- 0. SILENCE TENSORFLOW WARNINGS ---
+# This hides the oneDNN and technical info logs you saw in your terminal
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+
+# --- 1. ROBUST PATH CONFIGURATION ---
+base_dir = os.path.dirname(os.path.abspath(__file__)) # .../Backend
+root_dir = os.path.abspath(os.path.join(base_dir, '..')) # .../Project Root
+
+if root_dir not in sys.path:
+    sys.path.append(root_dir)
+
+# Importing your custom prediction logic from the root folder
+from predict import prepare_image, get_prediction
+
+# --- 2. INITIALIZATION ---
+app = Flask(__name__, 
+            template_folder=os.path.join(root_dir, 'Frontend', 'templates'),
+            static_folder=os.path.join(root_dir, 'Frontend', 'static'))
+
+# GROQ API CONFIGURATION (Option 1: Direct Assignment)
+# REPLACE THE STRING BELOW WITH YOUR ACTUAL KEY IF THIS IS NOT IT
+GROQ_API_KEY = "place your key" 
+client = Groq(api_key=GROQ_API_KEY)
+
+# --- 3. LOAD AI ASSETS ---
+MODEL_PATH = os.path.join(root_dir, 'Model_Assets', 'plant_cnn_model.h5')
+LABEL_PATH = os.path.join(root_dir, 'Model_Assets', 'class_names.json')
+
+print("--- AgriGuard System Startup ---")
+try:
+    print("Loading CNN Model...")
+    MODEL = tf.keras.models.load_model(MODEL_PATH)
+    with open(LABEL_PATH, 'r') as f:
+        LABELS = json.load(f)
+    print("✅ AI Assets Loaded Successfully.")
+except Exception as e:
+    print(f"❌ CRITICAL ERROR: Could not load assets. {e}")
+    sys.exit(1)
+
+# --- 4. CORE LOGIC FUNCTIONS ---
+
+def clean_label(raw_name):
+    """Converts 'Grape___Black_rot' -> 'Grape: Black Rot'"""
+    friendly_name = raw_name.replace("___", ": ").replace("_", " ")
+    return friendly_name.title()
+
+def get_ai_consultation(disease_name):
+    """Fetches professional treatment advice from Groq using Llama 3.3."""
+    
+    prompt = f"""
+    The plant disease '{disease_name}' has been detected. 
+    As an expert agronomist, provide:
+    1. A brief, simple description of the disease.
+    2. Top 3 organic treatment steps.
+    3. Preventive measures for next season.
+    
+    IMPORTANT: Format your response in Markdown with bullet points.
+    """
+    
+    try:
+        # Using Llama 3.3 70B for high-quality agronomist advice
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "You are a helpful, expert agronomist."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1024
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        print(f"Groq API Error: {e}")
+        return "Advice currently unavailable. Please follow standard organic farming quarantine procedures."
+
+# --- 5. ROUTES ---
+
+@app.route('/')
+def home():
+    """Renders the main Dashboard."""
+    return render_template('index.html')
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file uploaded'}), 400
+    
+    file = request.files['file']
+    try:
+        # Step A: Local CNN Detection
+        img_array = prepare_image(file)
+        raw_disease, confidence = get_prediction(MODEL, img_array, LABELS)
+        
+        # Step B: Human-Friendly Labeling
+        friendly_disease = clean_label(raw_disease)
+        
+        # Step C: AI Expert Consultation
+        advice = get_ai_consultation(friendly_disease)
+        
+        return jsonify({
+            'disease_name': friendly_disease,
+            'confidence': round(float(confidence), 2),
+            'treatment_advice': advice
+        })
+    except Exception as e:
+        print(f"Prediction logic error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/download-report', methods=['POST'])
+def download_report():
+    data = request.json
+    
+    html_content = f"""
+    <html>
+    <head><style>
+        body {{ font-family: Helvetica, Arial, sans-serif; padding: 30px; color: #1b4332; }}
+        .header {{ text-align: center; border-bottom: 2px solid #2d6a4f; padding-bottom: 10px; }}
+        .result-box {{ background: #f0f4f3; padding: 20px; border-radius: 10px; margin-top: 20px; }}
+        .label {{ font-weight: bold; color: #2d6a4f; }}
+        .advice-box {{ margin-top: 20px; line-height: 1.6; }}
+    </style></head>
+    <body>
+        <div class="header"><h1>AgriGuard AI: Diagnostic Report</h1></div>
+        <div class="result-box">
+            <p><span class="label">Detected Condition:</span> {data['disease_name']}</p>
+            <p><span class="label">Analysis Confidence:</span> {data['confidence']}%</p>
+        </div>
+        <div class="advice-box">
+            <h3>Treatment & Prevention Plan</h3>
+            {data['treatment_advice']}
+        </div>
+    </body>
+    </html>
+    """
+    
+    pdf_buffer = BytesIO()
+    pisa.CreatePDF(BytesIO(html_content.encode("utf-8")), dest=pdf_buffer)
+    
+    response = make_response(pdf_buffer.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f"attachment; filename=Report_{data['disease_name'].replace(' ', '_')}.pdf"
+    return response
+
+if __name__ == '__main__':
+    # Running on port 5000
+    app.run(debug=True, port=5000)

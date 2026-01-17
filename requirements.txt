@@ -1,0 +1,16 @@
+# Web Framework
+Flask==3.0.3
+Werkzeug==3.0.3
+
+# AI & Machine Learning
+tensorflow>=2.16.1
+numpy<2.0.0
+google-genai==0.3.0
+
+# PDF Generation & Processing
+xhtml2pdf==0.2.16
+reportlab==4.2.0
+
+# Utilities
+pillow==10.3.0
+h5py==3.11.0
