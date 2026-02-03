@@ -17,8 +17,8 @@
                 <span>AgriGuard AI</span>
             </div>
             <nav>
-                <div class="nav-item active"><i class="fas fa-th-large"></i> Dashboard</div>
-                <div class="nav-item"><i class="fas fa-history"></i> History</div>
+                <div class="nav-item active" data-section="dashboard"><i class="fas fa-th-large"></i> Dashboard</div>
+                <div class="nav-item" data-section="history"><i class="fas fa-history"></i> History</div>
             </nav>
             <div class="status-card">
                 <p>System Status</p>
@@ -61,6 +61,11 @@
                         </div>
                         <span id="conf-label">0%</span>
                     </div>
+                    <div class="result-actions">
+                        <button id="new-analysis-btn" class="btn-secondary">
+                            <i class="fas fa-plus"></i> New analysis
+                        </button>
+                    </div>
                 </div>
 
                 <div class="bento-item item-advice card">
@@ -71,6 +76,14 @@
                     <div id="advice-content" class="markdown-body"></div>
                 </div>
             </div>
+
+            <section id="history-section" class="card history-card hidden">
+                <div class="history-header">
+                    <h3><i class="fas fa-history"></i> Recent Analyses</h3>
+                    <span id="history-empty" class="history-empty-text">No analyses yet. Run a scan to see it here.</span>
+                </div>
+                <div id="history-list" class="history-list"></div>
+            </section>
         </main>
     </div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>

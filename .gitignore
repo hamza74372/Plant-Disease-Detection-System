@@ -1,4 +1,6 @@
 __pycache__/
 *.pyc
 venv/
+.venv/
 .env
+prediction_history.db

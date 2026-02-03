@@ -1,11 +1,14 @@
 import os
 import sys
 import json
+import sqlite3
+from datetime import datetime
+
 import tensorflow as tf
 from io import BytesIO
 from xhtml2pdf import pisa
 from flask import Flask, render_template, request, jsonify, make_response
-from groq import Groq  # Make sure to: pip install groq
+from groq import Groq  # pip install groq
 
 # --- 0. SILENCE TENSORFLOW WARNINGS ---
 # This hides the oneDNN and technical info logs you saw in your terminal
@@ -13,8 +16,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 
 # --- 1. ROBUST PATH CONFIGURATION ---
-base_dir = os.path.dirname(os.path.abspath(__file__)) # .../Backend
-root_dir = os.path.abspath(os.path.join(base_dir, '..')) # .../Project Root
+base_dir = os.path.dirname(os.path.abspath(__file__))  # .../Backend
+root_dir = os.path.abspath(os.path.join(base_dir, '..'))  # .../Project Root
 
 if root_dir not in sys.path:
     sys.path.append(root_dir)
@@ -23,20 +26,56 @@ if root_dir not in sys.path:
 from predict import prepare_image, get_prediction
 
 # --- 2. INITIALIZATION ---
-app = Flask(__name__, 
-            template_folder=os.path.join(root_dir, 'Frontend', 'templates'),
-            static_folder=os.path.join(root_dir, 'Frontend', 'static'))
+app = Flask(
+    __name__,
+    template_folder=os.path.join(root_dir, 'Frontend', 'templates'),
+    static_folder=os.path.join(root_dir, 'Frontend', 'static'),
+)
 
-# GROQ API CONFIGURATION (Option 1: Direct Assignment)
-# REPLACE THE STRING BELOW WITH YOUR ACTUAL KEY IF THIS IS NOT IT
-GROQ_API_KEY = "place your key" 
-client = Groq(api_key=GROQ_API_KEY)
+# GROQ API CONFIGURATION - read from environment
+# Set GROQ_API_KEY in your environment before running:
+#   Linux/macOS: export GROQ_API_KEY="your-key"
+#   Windows (PowerShell): setx GROQ_API_KEY "your-key"
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    print(
+        "⚠️  GROQ_API_KEY not set. "
+        "AI treatment advice will fall back to a generic message."
+    )
+    groq_client = None
+else:
+    groq_client = Groq(api_key=GROQ_API_KEY)
 
-# --- 3. LOAD AI ASSETS ---
+# --- 3. AI ASSETS & HISTORY DB ---
 MODEL_PATH = os.path.join(root_dir, 'Model_Assets', 'plant_cnn_model.h5')
 LABEL_PATH = os.path.join(root_dir, 'Model_Assets', 'class_names.json')
+HISTORY_DB_PATH = os.path.join(root_dir, 'prediction_history.db')
+
+
+def init_history_db():
+    """Ensure the SQLite DB and predictions table exist."""
+    try:
+        conn = sqlite3.connect(HISTORY_DB_PATH)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS predictions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at TEXT NOT NULL,
+                disease_name TEXT NOT NULL,
+                confidence REAL NOT NULL
+            )
+            """
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"History DB init error: {e}")
+
 
 print("--- AgriGuard System Startup ---")
+init_history_db()
+
 try:
     print("Loading CNN Model...")
     MODEL = tf.keras.models.load_model(MODEL_PATH)
@@ -55,8 +94,19 @@ def clean_label(raw_name):
     return friendly_name.title()
 
 def get_ai_consultation(disease_name):
-    """Fetches professional treatment advice from Groq using Llama 3.3."""
-    
+    """Fetches professional treatment advice from Groq using Llama 3.3.
+
+    Falls back to a generic message if GROQ_API_KEY is not configured
+    or the API call fails.
+    """
+
+    if groq_client is None:
+        return (
+            "Advice currently unavailable because the Groq API key is not "
+            "configured on this server. Please follow standard organic "
+            "farming quarantine procedures and consult a local agronomist."
+        )
+
     prompt = f"""
     The plant disease '{disease_name}' has been detected. 
     As an expert agronomist, provide:
@@ -69,7 +119,7 @@ def get_ai_consultation(disease_name):
     
     try:
         # Using Llama 3.3 70B for high-quality agronomist advice
-        completion = client.chat.completions.create(
+        completion = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
                 {"role": "system", "content": "You are a helpful, expert agronomist."},
@@ -82,6 +132,21 @@ def get_ai_consultation(disease_name):
     except Exception as e:
         print(f"Groq API Error: {e}")
         return "Advice currently unavailable. Please follow standard organic farming quarantine procedures."
+
+
+def log_prediction(disease_name: str, confidence_pct: float) -> None:
+    """Persist a single prediction in the history database."""
+    try:
+        conn = sqlite3.connect(HISTORY_DB_PATH)
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO predictions (created_at, disease_name, confidence) VALUES (?, ?, ?)",
+            (datetime.utcnow().isoformat(), disease_name, float(confidence_pct)),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"History logging error: {e}")
 
 # --- 5. ROUTES ---
 
@@ -103,18 +168,51 @@ def predict():
         
         # Step B: Human-Friendly Labeling
         friendly_disease = clean_label(raw_disease)
-        
+
         # Step C: AI Expert Consultation
         advice = get_ai_consultation(friendly_disease)
-        
-        return jsonify({
-            'disease_name': friendly_disease,
-            'confidence': round(float(confidence), 2),
-            'treatment_advice': advice
-        })
+
+        # Step D: Persist in history (store confidence as percentage)
+        confidence_pct = round(float(confidence) * 100.0, 1)
+        log_prediction(friendly_disease, confidence_pct)
+
+        return jsonify(
+            {
+                'disease_name': friendly_disease,
+                'confidence': round(float(confidence), 2),
+                'treatment_advice': advice,
+            }
+        )
     except Exception as e:
         print(f"Prediction logic error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/history', methods=['GET'])
+def history():
+    """Return recent prediction history as JSON (most recent first)."""
+    try:
+        conn = sqlite3.connect(HISTORY_DB_PATH)
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT created_at, disease_name, confidence "
+            "FROM predictions ORDER BY id DESC LIMIT 50"
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+        payload = [
+            {
+                'timestamp': created_at,
+                'disease_name': disease_name,
+                'confidence': confidence,  # already in percentage units
+            }
+            for (created_at, disease_name, confidence) in rows
+        ]
+        return jsonify(payload)
+    except Exception as e:
+        print(f"History fetch error: {e}")
+        return jsonify([]), 500
 
 @app.route('/download-report', methods=['POST'])
 def download_report():
@@ -153,4 +251,5 @@ def download_report():
 
 if __name__ == '__main__':
     # Running on port 5000
-    app.run(debug=True, port=5000)
+    debug_mode = os.environ.get("FLASK_DEBUG", "1") == "1"
+    app.run(debug=debug_mode, port=5000)
