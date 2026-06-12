@@ -4,6 +4,12 @@ import json
 import sqlite3
 from datetime import datetime
 
+# Reconfigure stdout/stderr to UTF-8 to prevent encoding errors on Windows when printing emojis
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8')
+
 import tensorflow as tf
 from io import BytesIO
 from xhtml2pdf import pisa
@@ -169,10 +175,7 @@ def predict():
         # Step B: Human-Friendly Labeling
         friendly_disease = clean_label(raw_disease)
 
-        # Step C: AI Expert Consultation
-        advice = get_ai_consultation(friendly_disease)
-
-        # Step D: Persist in history (store confidence as percentage)
+        # Step C: Persist in history (store confidence as percentage)
         confidence_pct = round(float(confidence) * 100.0, 1)
         log_prediction(friendly_disease, confidence_pct)
 
@@ -180,12 +183,28 @@ def predict():
             {
                 'disease_name': friendly_disease,
                 'confidence': round(float(confidence), 2),
-                'treatment_advice': advice,
             }
         )
     except Exception as e:
         print(f"Prediction logic error: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/get-advice', methods=['POST'])
+def get_advice():
+    """Fetches agronomist treatment advice for a specific disease."""
+    data = request.get_json()
+    if not data or 'disease_name' not in data:
+        return jsonify({'error': 'disease_name is required'}), 400
+    
+    try:
+        disease_name = data['disease_name']
+        advice = get_ai_consultation(disease_name)
+        return jsonify({'treatment_advice': advice})
+    except Exception as e:
+        print(f"Advice consultation error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 
 @app.route('/history', methods=['GET'])

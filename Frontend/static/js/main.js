@@ -105,7 +105,7 @@ async function startAnalysis(file) {
     };
     reader.readAsDataURL(file);
 
-    // Step B: Send to Flask Backend
+    // Step B: Send to Flask Backend for CNN Detection
     const formData = new FormData();
     formData.append('file', file);
 
@@ -115,10 +115,14 @@ async function startAnalysis(file) {
 
         if (data.error) throw new Error(data.error);
 
-        // Save data for PDF generation
-        currentAnalysisData = data;
+        // Save data for PDF generation (will be updated with treatment_advice later)
+        currentAnalysisData = {
+            disease_name: data.disease_name,
+            confidence: (data.confidence * 100).toFixed(1),
+            treatment_advice: null
+        };
 
-        // Step C: Update Result Cards
+        // Step C: Update Result Cards (Instantly)
         document.getElementById('disease-name').innerText = data.disease_name;
 
         // Confidence Progress Bar
@@ -126,9 +130,20 @@ async function startAnalysis(file) {
         document.getElementById('conf-label').innerText = `${confidence}% Match`;
         document.getElementById('conf-fill').style.width = `${confidence}%`;
 
-        // Render Markdown Advice
-        const adviceHtml = marked.parse(data.treatment_advice || 'No advice found.');
-        document.getElementById('advice-content').innerHTML = adviceHtml;
+        // Render Prompt for AI Advice
+        downloadBtn.disabled = true;
+        document.getElementById('advice-content').innerHTML = `
+            <div class="advice-prompt-container">
+                <div class="advice-icon-bg">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h4>Consult AI Agronomist</h4>
+                <p>Generate a customized, organic treatment checklist and seasonal prevention measures for <strong>${data.disease_name}</strong>.</p>
+                <button id="get-advice-btn" class="advice-action-btn">
+                    <i class="fas fa-wand-magic-sparkles"></i> Get Recommendations from AI
+                </button>
+            </div>
+        `;
 
         // Record in local history
         const previewSrc = document.getElementById('preview').src;
@@ -139,15 +154,82 @@ async function startAnalysis(file) {
             previewSrc,
         });
 
-        // Step D: Show Results
+        // Step D: Show Results Grid & Hide Global Loader
         loadingStage.classList.add('hidden');
         resultsGrid.classList.remove('hidden');
+
+        // Set up click handler for the AI recommendations button
+        document.getElementById('get-advice-btn').onclick = async () => {
+            const startTime = Date.now();
+
+            // Render Shimmering Skeleton Loader
+            document.getElementById('advice-content').innerHTML = `
+                <div class="skeleton-loader">
+                    <div class="skeleton-line title"></div>
+                    <div class="skeleton-line body-1"></div>
+                    <div class="skeleton-line body-2"></div>
+                    <div class="skeleton-line body-3"></div>
+                    <div class="skeleton-line body-4"></div>
+                </div>
+                <div class="advice-loading-status">
+                    <i class="fas fa-spinner"></i>
+                    <span>AI Agronomist is analyzing pathogens & preparing organic treatment plan...</span>
+                </div>
+            `;
+
+            // Step E: Fetch AI Recommendations Asynchronously
+            try {
+                const adviceResponse = await fetch('/get-advice', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ disease_name: data.disease_name })
+                });
+                const adviceData = await adviceResponse.json();
+                if (adviceData.error) throw new Error(adviceData.error);
+
+                // Enforce a minimum delay of 3 seconds (3000 ms) to show the loading animation
+                const elapsed = Date.now() - startTime;
+                const remainingDelay = Math.max(0, 3000 - elapsed);
+                if (remainingDelay > 0) {
+                    await new Promise(resolve => setTimeout(resolve, remainingDelay));
+                }
+
+                // Update local state and HTML content
+                currentAnalysisData.treatment_advice = adviceData.treatment_advice;
+                document.getElementById('advice-content').innerHTML = marked.parse(adviceData.treatment_advice || 'No advice found.');
+                downloadBtn.disabled = false;
+            } catch (adviceErr) {
+                console.error('Failed to get AI advice:', adviceErr);
+                
+                // Even on error, maintain the 3-second minimum load experience
+                const elapsed = Date.now() - startTime;
+                const remainingDelay = Math.max(0, 3000 - elapsed);
+                if (remainingDelay > 0) {
+                    await new Promise(resolve => setTimeout(resolve, remainingDelay));
+                }
+
+                document.getElementById('advice-content').innerHTML = `
+                    <div class="advice-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>
+                            <strong>Expert consultation unavailable</strong><br>
+                            <span style="font-size: 0.85rem; opacity: 0.9;">
+                                The AI was unable to generate recommendations. Please ensure your Groq API key is set.
+                            </span>
+                        </div>
+                    </div>
+                `;
+                downloadBtn.disabled = true;
+            }
+        };
+
     } catch (err) {
         console.error('Analysis Error:', err);
         alert('System encountered an error. Please try again.');
         location.reload();
     }
 }
+
 
 // 6. History Rendering
 function renderHistory() {
